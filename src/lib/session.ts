@@ -25,6 +25,7 @@ export function readSession(): Session | null {
     if (
       !isTenantId(parsed.tenantId) ||
       !isRole(parsed.role) ||
+      typeof parsed.userId !== 'string' ||
       typeof parsed.email !== 'string' ||
       typeof parsed.name !== 'string' ||
       typeof parsed.token !== 'string'

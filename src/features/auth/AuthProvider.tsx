@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { DEMO_USER_IDS } from '@/lib/demo-users'
 import { clearSession, readSession, writeSession } from '@/lib/session'
 import type { Session } from '@/lib/types'
 import { AuthContext, type LoginInput } from './auth-context'
@@ -23,10 +24,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => readSession())
 
   const login = useCallback((input: LoginInput) => {
+    const userId = DEMO_USER_IDS[input.tenantId][input.role]
     const newSession: Session = {
       ...input,
+      userId,
       name: displayNameFromEmail(input.email),
-      token: `mock.${input.tenantId}.${input.role}.${crypto.randomUUID()}`,
+      token: `mock.${input.tenantId}.${input.role}.${userId}`,
     }
 
     writeSession(newSession)

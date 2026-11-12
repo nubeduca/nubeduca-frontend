@@ -24,6 +24,8 @@ export class ApiError extends Error {
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  rawBody?: BodyInit
+  contentType?: string
   headers?: Record<string, string>
   signal?: AbortSignal
 }
@@ -34,13 +36,15 @@ function buildHeaders(options: ApiRequestOptions): Record<string, string> {
     ...options.headers,
   }
 
-  if (options.body !== undefined) {
+  if (options.rawBody !== undefined) {
+    headers['Content-Type'] = options.contentType ?? 'text/plain'
+  } else if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
 
   const session = readSession()
   if (session) {
-    headers.Authorization = session.token
+    headers.Authorization = `Bearer ${session.token}`
   }
 
   return headers
@@ -63,7 +67,12 @@ export async function apiRequest<T>(
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
     method: options.method ?? 'GET',
     headers: buildHeaders(options),
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.rawBody !== undefined
+        ? options.rawBody
+        : options.body === undefined
+          ? undefined
+          : JSON.stringify(options.body),
     signal: options.signal,
   })
 
@@ -95,6 +104,19 @@ export const api = {
     body?: unknown,
     options?: ApiRequestOptions,
   ) => apiRequest<T>(service, path, { ...options, method: 'POST', body }),
+  postRaw: <T>(
+    service: ApiService,
+    path: string,
+    rawBody: BodyInit,
+    contentType: string,
+    options?: ApiRequestOptions,
+  ) =>
+    apiRequest<T>(service, path, {
+      ...options,
+      method: 'POST',
+      rawBody,
+      contentType,
+    }),
   put: <T>(
     service: ApiService,
     path: string,
