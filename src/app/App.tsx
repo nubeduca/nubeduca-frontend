@@ -67,7 +67,14 @@ export function App() {
             <Route path="cursos/:courseId" element={<CursoDetallePage />} />
             <Route path="contenidos" element={<ContenidosPage />} />
             <Route path="evaluaciones" element={<EvaluacionesPage />} />
-            <Route path="calificaciones" element={<CalificacionesPage />} />
+            <Route
+              path="calificaciones"
+              element={
+                <RequireAuth roles={['STUDENT', 'TEACHER']}>
+                  <CalificacionesPage />
+                </RequireAuth>
+              }
+            />
             <Route path="notificaciones" element={<NotificacionesPage />} />
             <Route
               path="admin/usuarios"

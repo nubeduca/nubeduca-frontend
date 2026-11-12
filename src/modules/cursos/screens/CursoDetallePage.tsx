@@ -1,4 +1,11 @@
-import { Archive, ChevronLeft, Pencil, Send } from 'lucide-react'
+import {
+  Archive,
+  ChevronLeft,
+  ClipboardList,
+  GraduationCap,
+  Pencil,
+  Send,
+} from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -257,6 +264,27 @@ export function CursoDetallePage() {
           </div>
         </CardContent>
       </Card>
+
+      {course.status !== 'ARCHIVED' ? (
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to={`/evaluaciones?curso=${course.courseId}`}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-brand-200 hover:text-brand-700"
+          >
+            <ClipboardList className="size-4" aria-hidden />
+            Evaluaciones del curso
+          </Link>
+          {session.role !== 'ADMIN' ? (
+            <Link
+              to={`/calificaciones?curso=${course.courseId}`}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-brand-200 hover:text-brand-700"
+            >
+              <GraduationCap className="size-4" aria-hidden />
+              {session.role === 'TEACHER' ? 'Libro de notas' : 'Mis notas'}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {actionError ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

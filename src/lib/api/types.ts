@@ -178,3 +178,148 @@ export interface Health {
   service: string
   version: string
 }
+
+// ms-contenidos · archivos (para entregas)
+
+export type FilePurpose = 'CONTENT' | 'SUBMISSION'
+
+export interface UploadRequest {
+  courseId: string
+  purpose: FilePurpose
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}
+
+export interface UploadTicket {
+  fileId: string
+  uploadUrl: string
+  method: 'PUT'
+  headers: Record<string, string>
+  expiresAt: string
+}
+
+export interface DownloadLink {
+  downloadUrl: string
+  expiresAt: string
+}
+
+// ms-evaluaciones
+
+export type AssignmentStatus = 'DRAFT' | 'PUBLISHED'
+
+export interface AssignmentInput {
+  title: string
+  instructions?: string
+  dueAt: string
+  maxScore: number
+  allowLate?: boolean
+}
+
+export interface AssignmentUpdate {
+  title?: string
+  instructions?: string
+  dueAt?: string
+  allowLate?: boolean
+}
+
+export interface Assignment extends AssignmentInput {
+  assignmentId: string
+  courseId: string
+  status: AssignmentStatus
+}
+
+export interface AssignmentPage {
+  items: Assignment[]
+  nextToken: string | null
+}
+
+export interface SubmissionInput {
+  fileIds: string[]
+  comment?: string
+}
+
+export type SubmissionStatus = 'SUBMITTED' | 'GRADED'
+
+export interface Submission {
+  submissionId: string
+  assignmentId: string
+  studentId: string
+  attempt: number
+  fileIds: string[]
+  comment?: string
+  late: boolean
+  status: SubmissionStatus
+  score?: number | null
+  feedback?: string | null
+  submittedAt: string
+}
+
+export interface SubmissionPage {
+  items: Submission[]
+  nextToken: string | null
+}
+
+export interface GradeInput {
+  score: number
+  feedback?: string
+}
+
+// ms-calificaciones
+
+export interface GradeItem {
+  gradeItemId: string
+  courseId: string
+  title: string
+  maxScore: number
+  assignmentId?: string
+}
+
+export type GradeStatus = 'DRAFT' | 'POSTED'
+
+export interface Grade {
+  gradeId: string
+  gradeItemId: string
+  studentId: string
+  score: number
+  maxScore: number
+  status: GradeStatus
+  postedAt?: string | null
+  /**
+   * Propuesta compatible (campo opcional) para ms-calificaciones: sin esto el
+   * alumno no sabe a qué tarea corresponde cada nota en GET /grades/me.
+   */
+  title?: string
+  assignmentId?: string
+}
+
+export interface GradeList {
+  items: Grade[]
+}
+
+export interface Gradebook {
+  gradeItems: GradeItem[]
+  rows: Array<{ studentId: string; grades: Grade[] }>
+}
+
+export interface PostResult {
+  posted: number
+}
+
+export interface GradeOverride {
+  score: number
+  reason: string
+}
+
+export interface GradeHistoryEntry {
+  previousScore: number | null
+  score: number
+  cause: 'GRADED' | 'MANUAL_OVERRIDE'
+  reason?: string | null
+  changedBy: string
+  changedAt: string
+}
+
+export interface GradeHistory {
+  items: GradeHistoryEntry[]
+}
