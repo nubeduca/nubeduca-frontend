@@ -91,9 +91,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <p className="mt-1 break-all">{session.email}</p>
             </div>
           ) : null}
-          <p className="mt-3 px-1 text-[11px] text-slate-400">
-            Fase 0 · Shell del frontend (FE-01)
-          </p>
+          <p className="mt-3 px-1 text-[11px] text-slate-400">Fase 1 · MVP académico</p>
         </div>
       </aside>
     </>

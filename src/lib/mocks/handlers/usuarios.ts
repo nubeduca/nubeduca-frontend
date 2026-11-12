@@ -64,6 +64,23 @@ export const usuarioHandlers = [
     })
   }),
 
+  http.post('/mock-api/usuarios/users/me', ({ request }) => {
+    const auth = getAuth(request)
+    if (!auth) {
+      return unauthorized()
+    }
+
+    // En el mock todos los usuarios de demo ya tienen perfil: responde 200.
+    const user = mockState.db.users.find(
+      (item) => item.tenantId === auth.tenantId && item.userId === auth.userId,
+    )
+    if (!user) {
+      return notFound('USUARIO_NO_ENCONTRADO', 'No existe el usuario.')
+    }
+
+    return HttpResponse.json(toUser(user))
+  }),
+
   http.get('/mock-api/usuarios/users/me', ({ request }) => {
     const auth = getAuth(request)
     if (!auth) {

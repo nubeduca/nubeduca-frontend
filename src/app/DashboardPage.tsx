@@ -16,8 +16,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Spinner,
 } from '@/components/ui'
 import { useAuth } from '@/features/auth/auth-context'
+import { listCourses } from '@/lib/api/cursos'
+import { listMyNotifications } from '@/lib/api/notificaciones'
+import type { CourseStatus } from '@/lib/api/types'
+import { useApi } from '@/lib/hooks/useApi'
 import { ROLE_LABELS, TENANT_LABELS } from '@/lib/types'
 
 const moduleDescriptions: Record<string, string> = {
@@ -29,15 +34,39 @@ const moduleDescriptions: Record<string, string> = {
   '/admin/usuarios': 'Perfiles y roles del tenant.',
 }
 
-const stats = [
-  { label: 'Cursos', value: '—', icon: BookOpen },
-  { label: 'Tareas', value: '—', icon: ClipboardList },
-  { label: 'Notas', value: '—', icon: GraduationCap },
-  { label: 'Avisos', value: '—', icon: Bell },
-]
+interface Stat {
+  label: string
+  value: string
+  hint: string
+  icon: typeof BookOpen
+}
+
+function countLabel(page: { items: unknown[]; nextToken: string | null } | null): string {
+  if (!page) {
+    return '—'
+  }
+  return page.nextToken ? `${page.items.length}+` : String(page.items.length)
+}
+
+const STATUS_LABELS: Record<CourseStatus, string> = {
+  DRAFT: 'Borrador',
+  PUBLISHED: 'Publicado',
+  ARCHIVED: 'Archivado',
+}
+
+const STATUS_VARIANTS: Record<CourseStatus, 'success' | 'warning' | 'neutral'> = {
+  DRAFT: 'warning',
+  PUBLISHED: 'success',
+  ARCHIVED: 'neutral',
+}
 
 export function DashboardPage() {
-  const { session } = useAuth()
+  const { session, mode } = useAuth()
+  const coursesState = useApi(() => listCourses({ limit: 100 }), [session?.userId])
+  const notificationsState = useApi(
+    () => listMyNotifications({ limit: 100 }),
+    [session?.userId],
+  )
 
   if (!session) {
     return null
@@ -45,13 +74,42 @@ export function DashboardPage() {
 
   const firstName = session.name.split(' ')[0] ?? session.name
   const quickLinks = navItemsForRole(session.role).filter((item) => item.to !== '/')
+  const courses = coursesState.data?.items ?? []
+  const isTeacher = session.role === 'TEACHER'
+
+  const stats: Stat[] = [
+    {
+      label: isTeacher
+        ? 'Cursos a cargo'
+        : session.role === 'ADMIN'
+          ? 'Cursos'
+          : 'Mis cursos',
+      value: coursesState.loading ? '…' : countLabel(coursesState.data),
+      hint: coursesState.error ? 'Sin conexión' : 'ms-cursos',
+      icon: BookOpen,
+    },
+    { label: 'Tareas', value: '—', hint: 'Llega con FE-03', icon: ClipboardList },
+    { label: 'Notas', value: '—', hint: 'Llega con FE-03', icon: GraduationCap },
+    {
+      label: 'Avisos',
+      value: notificationsState.loading ? '…' : countLabel(notificationsState.data),
+      hint: notificationsState.error ? 'Sin conexión' : 'ms-notificaciones',
+      icon: Bell,
+    },
+  ]
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Inicio"
         title={`Hola, ${firstName}`}
-        description="Este es el shell del frontend. Todavía no hay datos reales: las pantallas de cada módulo se irán conectando a los contratos OpenAPI."
+        description={
+          isTeacher
+            ? 'Gestiona tus cursos, matrículas y contenidos desde aquí.'
+            : session.role === 'ADMIN'
+              ? 'Resumen académico de tu institución.'
+              : 'Tus cursos, materiales y avisos en un solo lugar.'
+        }
         actions={
           <Badge variant="brand">
             <Sparkles className="mr-1 size-3" aria-hidden />
@@ -60,10 +118,13 @@ export function DashboardPage() {
         }
       />
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        <strong className="font-semibold">Sesión simulada.</strong> El tenant y el rol se
-        guardan en el navegador. En AUTH-01 pasarán a salir del token de Cognito.
-      </div>
+      {mode === 'mock' ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong className="font-semibold">Modo demo.</strong> La sesión es simulada y
+          los datos son de prueba. Con Cognito (AUTH-01) el tenant y el rol salen del
+          token.
+        </div>
+      ) : null}
 
       <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
@@ -78,7 +139,7 @@ export function DashboardPage() {
                   <p className="mt-1 text-2xl font-semibold text-slate-900">
                     {stat.value}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">Sin conectar</p>
+                  <p className="mt-1 text-xs text-slate-400">{stat.hint}</p>
                 </div>
                 <span className="flex size-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                   <Icon className="size-5" aria-hidden />
@@ -88,6 +149,67 @@ export function DashboardPage() {
           )
         })}
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{isTeacher ? 'Cursos a tu cargo' : 'Mis cursos'}</CardTitle>
+          <CardDescription>
+            {isTeacher
+              ? 'Incluye borradores; publícalos para que los alumnos los vean.'
+              : 'Cursos publicados en los que estás matriculado.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {coursesState.loading ? (
+            <div className="flex justify-center py-6">
+              <Spinner />
+            </div>
+          ) : coursesState.error ? (
+            <p className="text-sm text-rose-700">{coursesState.error}</p>
+          ) : courses.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              {isTeacher
+                ? 'Todavía no tienes cursos. Créalos desde Cursos.'
+                : 'Todavía no estás matriculado en ningún curso publicado.'}
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {courses.slice(0, 5).map((course) => (
+                <li key={course.courseId}>
+                  <Link
+                    to={`/cursos/${course.courseId}`}
+                    className="group flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900 group-hover:text-brand-700">
+                        {course.title}
+                      </p>
+                      <p className="text-xs text-slate-500">{course.code}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant={STATUS_VARIANTS[course.status]}>
+                        {STATUS_LABELS[course.status]}
+                      </Badge>
+                      <ArrowRight
+                        className="size-4 text-slate-300 group-hover:text-brand-500"
+                        aria-hidden
+                      />
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {courses.length > 5 ? (
+            <Link
+              to="/cursos"
+              className="mt-2 inline-block text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+              Ver los {countLabel(coursesState.data)} cursos
+            </Link>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <section aria-label="Módulos">
         <div className="mb-3 flex items-center justify-between">
@@ -123,25 +245,6 @@ export function DashboardPage() {
           })}
         </div>
       </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Estado del shell</CardTitle>
-          <CardDescription>
-            Lo que ya deja listo FE-01 para el resto del equipo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <li>✅ Layout con sidebar, topbar y menú por rol</li>
-            <li>✅ Rutas por módulo y carpeta de pantallas</li>
-            <li>✅ Design system base reutilizable</li>
-            <li>✅ Login simulado con tenant y rol</li>
-            <li>✅ Cliente de API con variables VITE_API_*</li>
-            <li>⏳ Despliegue en AWS Amplify</li>
-          </ul>
-        </CardContent>
-      </Card>
     </div>
   )
 }

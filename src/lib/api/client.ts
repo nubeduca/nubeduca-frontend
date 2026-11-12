@@ -1,5 +1,9 @@
-import { API_BASE_URLS, type ApiService } from '@/lib/env'
-import { readSession } from '@/lib/session'
+import { cognitoIdToken } from '@/features/auth/cognito'
+import { API_BASE_URLS, IS_COGNITO_AUTH, type ApiService } from '@/lib/env'
+import { readSession, writeSession } from '@/lib/session'
+
+/** Se dispara cuando la sesión ya no es válida (401); AuthProvider cierra sesión. */
+export const SESSION_EXPIRED_EVENT = 'nubeduca:session-expired'
 
 export interface ApiErrorBody {
   code?: string
@@ -30,7 +34,24 @@ export interface ApiRequestOptions {
   signal?: AbortSignal
 }
 
-function buildHeaders(options: ApiRequestOptions): Record<string, string> {
+async function currentToken(): Promise<string | null> {
+  const session = readSession()
+  if (!session) {
+    return null
+  }
+  if (!IS_COGNITO_AUTH) {
+    return session.token
+  }
+
+  // Amplify renueva el ID token con el refresh token cuando está por vencer.
+  const token = await cognitoIdToken()
+  if (token && token !== session.token) {
+    writeSession({ ...session, token })
+  }
+  return token
+}
+
+async function buildHeaders(options: ApiRequestOptions): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...options.headers,
@@ -42,9 +63,9 @@ function buildHeaders(options: ApiRequestOptions): Record<string, string> {
     headers['Content-Type'] = 'application/json'
   }
 
-  const session = readSession()
-  if (session) {
-    headers.Authorization = `Bearer ${session.token}`
+  const token = await currentToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
   }
 
   return headers
@@ -66,7 +87,7 @@ export async function apiRequest<T>(
 
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
     method: options.method ?? 'GET',
-    headers: buildHeaders(options),
+    headers: await buildHeaders(options),
     body:
       options.rawBody !== undefined
         ? options.rawBody
@@ -81,6 +102,10 @@ export async function apiRequest<T>(
   }
 
   const data: unknown = await response.json().catch(() => null)
+
+  if (response.status === 401 && readSession()) {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+  }
 
   if (!response.ok) {
     const body = (data ?? {}) as ApiErrorBody

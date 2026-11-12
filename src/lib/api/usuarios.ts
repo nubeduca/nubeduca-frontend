@@ -30,3 +30,8 @@ export function getUser(userId: string): Promise<User> {
 export function getMe(): Promise<User> {
   return api.get<User>('usuarios', '/users/me')
 }
+
+/** Crea mi perfil si no existe (idempotente). Se llama justo después del login. */
+export function provisionMe(): Promise<User> {
+  return api.post<User>('usuarios', '/users/me')
+}

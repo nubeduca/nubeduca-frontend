@@ -36,3 +36,18 @@ export const API_BASE_URLS: Record<ApiService, string | undefined> = IS_MOCK_MOD
       calificaciones: env.VITE_API_CALIFICACIONES,
       notificaciones: env.VITE_API_NOTIFICACIONES,
     }
+
+export type AuthMode = 'mock' | 'cognito'
+
+export const AUTH_MODE: AuthMode = env.VITE_AUTH_MODE === 'cognito' ? 'cognito' : 'mock'
+
+export const IS_COGNITO_AUTH = AUTH_MODE === 'cognito'
+
+export const COGNITO_CONFIG = {
+  userPoolId: env.VITE_COGNITO_USER_POOL_ID ?? '',
+  userPoolClientId: env.VITE_COGNITO_CLIENT_ID ?? '',
+}
+
+export const IS_COGNITO_CONFIGURED = Boolean(
+  COGNITO_CONFIG.userPoolId && COGNITO_CONFIG.userPoolClientId,
+)

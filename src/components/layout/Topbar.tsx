@@ -22,7 +22,7 @@ function initialsFromName(name: string): string {
 }
 
 export function Topbar({ onOpenMenu }: TopbarProps) {
-  const { session, logout } = useAuth()
+  const { session, logout, mode } = useAuth()
   const navigate = useNavigate()
 
   function handleLogout() {
@@ -46,15 +46,17 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
             {session ? TENANT_LABELS[session.tenantId] : 'Nubeduca'}
           </p>
           <p className="truncate text-xs text-slate-500">
-            {session ? ROLE_LABELS[session.role] : 'Shell del frontend'}
+            {session ? ROLE_LABELS[session.role] : 'LMS multi-tenant'}
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant="warning" className="hidden sm:inline-flex">
-          Sesión simulada
-        </Badge>
+        {mode === 'mock' ? (
+          <Badge variant="warning" className="hidden sm:inline-flex">
+            Modo demo
+          </Badge>
+        ) : null}
         <NotificationBell count={0} />
         {session ? (
           <div className="flex items-center gap-2">

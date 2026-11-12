@@ -35,20 +35,21 @@ const roleOptions = ROLES.map((role) => ({
 }))
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { login, mode } = useAuth()
+  const isMock = mode === 'mock'
   const navigate = useNavigate()
   const location = useLocation()
 
   const [tenantId, setTenantId] = useState<TenantId>('utec')
   const [role, setRole] = useState<Role>('TEACHER')
   const [emailOverride, setEmailOverride] = useState<string | null>(null)
-  const [password, setPassword] = useState('demo1234')
+  const [password, setPassword] = useState(isMock ? 'demo1234' : '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const email = emailOverride ?? suggestedEmail(tenantId, role)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
 
@@ -58,12 +59,22 @@ export function LoginPage() {
     }
 
     if (password.trim().length === 0) {
-      setError('Escribe cualquier contraseña (el login es simulado).')
+      setError(
+        isMock
+          ? 'Escribe cualquier contraseña (el login es simulado).'
+          : 'Escribe tu contraseña.',
+      )
       return
     }
 
     setSubmitting(true)
-    login({ tenantId, role, email: email.trim().toLowerCase() })
+    try {
+      await login({ tenantId, role, email: email.trim().toLowerCase(), password })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar sesión.')
+      setSubmitting(false)
+      return
+    }
 
     const state = location.state as { from?: string } | null
     navigate(state?.from ?? '/', { replace: true })
@@ -92,7 +103,7 @@ export function LoginPage() {
           <div className="space-y-4">
             <Badge variant="brand" className="bg-white/10 text-brand-100 ring-white/20">
               <Sparkles className="mr-1 size-3" aria-hidden />
-              Shell del frontend · FE-01
+              {isMock ? 'Modo demo' : 'Acceso institucional'}
             </Badge>
             <h1 className="max-w-md text-4xl font-semibold tracking-tight">
               Un LMS multi-tenant para UTEC, UPC y PUCP.
@@ -114,13 +125,15 @@ export function LoginPage() {
             </li>
             <li className="flex items-center gap-3">
               <ShieldCheck className="size-4 text-brand-300" aria-hidden />
-              El tenant y el rol saldrán del token de Cognito.
+              Tu institución y tu rol salen de tu cuenta, no del formulario.
             </li>
           </ul>
         </div>
 
         <p className="relative text-xs text-slate-400">
-          Fase 0 · Fundaciones · El login es simulado hasta completar AUTH-01.
+          {isMock
+            ? 'Modo demo · El login es simulado hasta completar AUTH-01.'
+            : 'Inicio de sesión con Amazon Cognito.'}
         </p>
       </aside>
 
@@ -143,16 +156,24 @@ export function LoginPage() {
               Iniciar sesión
             </h2>
             <p className="text-sm text-slate-500">
-              Elige tu institución y tu rol para entrar al shell.
+              {isMock
+                ? 'Elige tu institución y tu rol para entrar.'
+                : 'Elige tu institución y entra con tu correo institucional.'}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <strong className="font-semibold">Login simulado.</strong> No valida
-            credenciales reales; se reemplazará por Cognito en AUTH-01.
-          </div>
+          {isMock ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <strong className="font-semibold">Login simulado.</strong> No valida
+              credenciales reales; se reemplazará por Cognito en AUTH-01.
+            </div>
+          ) : null}
 
-          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => void handleSubmit(event)}
+            noValidate
+          >
             <Select
               label="Institución"
               options={tenantOptions}
@@ -162,15 +183,17 @@ export function LoginPage() {
                 setEmailOverride(null)
               }}
             />
-            <Select
-              label="Rol"
-              options={roleOptions}
-              value={role}
-              onChange={(event) => {
-                setRole(event.target.value as Role)
-                setEmailOverride(null)
-              }}
-            />
+            {isMock ? (
+              <Select
+                label="Rol"
+                options={roleOptions}
+                value={role}
+                onChange={(event) => {
+                  setRole(event.target.value as Role)
+                  setEmailOverride(null)
+                }}
+              />
+            ) : null}
             <Input
               label="Correo institucional"
               type="email"
@@ -184,7 +207,7 @@ export function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              hint="Cualquier valor sirve en este login simulado."
+              hint={isMock ? 'Cualquier valor sirve en este login simulado.' : undefined}
               error={error ?? undefined}
             />
             <Button
@@ -198,7 +221,10 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-500">
+          <div
+            className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-500"
+            hidden={!isMock}
+          >
             <p className="font-medium text-slate-700">Usuarios de demo</p>
             <p className="mt-1">Docente: docente.demo@utec.edu.pe</p>
             <p>Estudiante: alumno.demo@utec.edu.pe</p>
