@@ -76,7 +76,7 @@ Convenciones del contrato v1:
 - IDs, rutas y campos en inglés/camelCase; textos para el usuario en español.
 - El `tenantId` y el rol salen del token (`custom:tenant_id`, `custom:role`), nunca del body.
 - Errores con forma `{ code, message, requestId }`.
-- Las URLs base van en `VITE_API_*`.
+- Las URLs base van en `VITE_API_*`. **Modo mixto:** con `VITE_USE_MOCKS=true`, el servicio que tenga su `VITE_API_*` llena usa la API real y el resto sigue en MSW (p. ej. solo `VITE_API_NOTIFICACIONES`).
 
 ## Cliente de API
 
