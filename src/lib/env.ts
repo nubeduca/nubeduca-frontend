@@ -19,23 +19,36 @@ function mockBase(service: ApiService): string {
   return `${MOCK_API_PREFIX}/${service}`
 }
 
-export const API_BASE_URLS: Record<ApiService, string | undefined> = IS_MOCK_MODE
-  ? {
-      usuarios: mockBase('usuarios'),
-      cursos: mockBase('cursos'),
-      contenidos: mockBase('contenidos'),
-      evaluaciones: mockBase('evaluaciones'),
-      calificaciones: mockBase('calificaciones'),
-      notificaciones: mockBase('notificaciones'),
+const REAL_URLS: Record<ApiService, string | undefined> = {
+  usuarios: env.VITE_API_USUARIOS,
+  cursos: env.VITE_API_CURSOS,
+  contenidos: env.VITE_API_CONTENIDOS,
+  evaluaciones: env.VITE_API_EVALUACIONES,
+  calificaciones: env.VITE_API_CALIFICACIONES,
+  notificaciones: env.VITE_API_NOTIFICACIONES,
+}
+
+function hasUrl(url: string | undefined): url is string {
+  return Boolean(url?.trim())
+}
+
+/**
+ * Modo mixto: con mocks activos, el servicio que ya tiene `VITE_API_*` usa su
+ * API real y el resto sigue en MSW. Sin mocks, todos van a su URL real.
+ */
+export const REAL_SERVICES: ApiService[] = API_SERVICES.filter((service) =>
+  hasUrl(REAL_URLS[service]),
+)
+
+export const API_BASE_URLS = Object.fromEntries(
+  API_SERVICES.map((service) => {
+    const url = REAL_URLS[service]
+    if (!IS_MOCK_MODE) {
+      return [service, url]
     }
-  : {
-      usuarios: env.VITE_API_USUARIOS,
-      cursos: env.VITE_API_CURSOS,
-      contenidos: env.VITE_API_CONTENIDOS,
-      evaluaciones: env.VITE_API_EVALUACIONES,
-      calificaciones: env.VITE_API_CALIFICACIONES,
-      notificaciones: env.VITE_API_NOTIFICACIONES,
-    }
+    return [service, hasUrl(url) ? url.trim() : mockBase(service)]
+  }),
+) as Record<ApiService, string | undefined>
 
 export type AuthMode = 'mock' | 'cognito'
 
