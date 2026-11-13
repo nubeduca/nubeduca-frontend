@@ -16,6 +16,7 @@ import type {
   MockPreference,
   MockSection,
 } from '../types'
+import { seedAssessments } from './assessments'
 import { mockId } from './ids'
 import { TERMS } from './terms'
 import { USERS } from './users'
@@ -386,6 +387,7 @@ export function seedDb(): MockDb {
   })
 
   return {
+    ...seedAssessments(courses, enrollments),
     users: USERS.map((user) => ({ ...user })),
     terms: TERMS.map((term) => ({ ...term })),
     courses,

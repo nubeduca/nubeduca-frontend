@@ -1,19 +1,27 @@
 import type {
+  Assignment,
   Course,
   Enrollment,
+  Grade,
+  GradeItem,
   Module,
   ModuleItem,
   Notification,
   Section,
+  Submission,
   Term,
   User,
 } from '@/lib/api/types'
 import type {
+  MockAssignment,
   MockCourse,
   MockEnrollment,
+  MockGrade,
+  MockGradeItem,
   MockModule,
   MockNotification,
   MockSection,
+  MockSubmission,
   MockTerm,
   MockUser,
 } from './types'
@@ -102,5 +110,59 @@ export function toNotification(notification: MockNotification): Notification {
     courseId: notification.courseId,
     status: notification.status,
     createdAt: notification.createdAt,
+  }
+}
+
+export function toAssignment(assignment: MockAssignment): Assignment {
+  return {
+    assignmentId: assignment.assignmentId,
+    courseId: assignment.courseId,
+    title: assignment.title,
+    instructions: assignment.instructions,
+    dueAt: assignment.dueAt,
+    maxScore: assignment.maxScore,
+    allowLate: assignment.allowLate,
+    status: assignment.status,
+  }
+}
+
+/** Si `hideGrade`, no expone la nota (el alumno solo la ve cuando se publica). */
+export function toSubmission(submission: MockSubmission, hideGrade = false): Submission {
+  return {
+    submissionId: submission.submissionId,
+    assignmentId: submission.assignmentId,
+    studentId: submission.studentId,
+    attempt: submission.attempt,
+    fileIds: [...submission.fileIds],
+    comment: submission.comment,
+    late: submission.late,
+    status: hideGrade ? 'SUBMITTED' : submission.status,
+    score: hideGrade ? null : (submission.score ?? null),
+    feedback: hideGrade ? null : (submission.feedback ?? null),
+    submittedAt: submission.submittedAt,
+  }
+}
+
+export function toGradeItem(item: MockGradeItem): GradeItem {
+  return {
+    gradeItemId: item.gradeItemId,
+    courseId: item.courseId,
+    title: item.title,
+    maxScore: item.maxScore,
+    assignmentId: item.assignmentId,
+  }
+}
+
+export function toGrade(grade: MockGrade): Grade {
+  return {
+    gradeId: grade.gradeId,
+    gradeItemId: grade.gradeItemId,
+    studentId: grade.studentId,
+    score: grade.score,
+    maxScore: grade.maxScore,
+    status: grade.status,
+    postedAt: grade.postedAt ?? null,
+    title: grade.title,
+    assignmentId: grade.assignmentId,
   }
 }

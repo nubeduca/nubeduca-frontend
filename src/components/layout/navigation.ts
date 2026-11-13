@@ -44,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/calificaciones',
     label: 'Calificaciones',
     icon: GraduationCap,
+    roles: ['STUDENT', 'TEACHER'],
   },
   {
     to: '/notificaciones',

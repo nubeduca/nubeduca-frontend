@@ -19,11 +19,13 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuth } from '@/features/auth/auth-context'
+import { getGradebook, getMyGrades } from '@/lib/api/calificaciones'
 import { listCourses } from '@/lib/api/cursos'
+import { listAssignments } from '@/lib/api/evaluaciones'
 import { listMyNotifications } from '@/lib/api/notificaciones'
 import type { CourseStatus } from '@/lib/api/types'
 import { useApi } from '@/lib/hooks/useApi'
-import { ROLE_LABELS, TENANT_LABELS } from '@/lib/types'
+import { ROLE_LABELS, TENANT_LABELS, type Session } from '@/lib/types'
 
 const moduleDescriptions: Record<string, string> = {
   '/cursos': 'Catálogo, detalle y matrícula.',
@@ -60,9 +62,63 @@ const STATUS_VARIANTS: Record<CourseStatus, 'success' | 'warning' | 'neutral'> =
   ARCHIVED: 'neutral',
 }
 
+interface AcademicSummary {
+  assignments: number
+  drafts: number
+  grades: number
+}
+
+/**
+ * Resumen de tareas y notas recorriendo los cursos visibles (como mucho 10).
+ * El docente cuenta notas en borrador; el alumno, sus notas publicadas.
+ */
+async function loadAcademicSummary(
+  session: Session | null,
+): Promise<AcademicSummary | null> {
+  if (!session || session.role === 'ADMIN') {
+    return null
+  }
+  const { items } = await listCourses({ limit: 100 })
+  const courses = items.filter((course) => course.status !== 'ARCHIVED').slice(0, 10)
+  const isTeacher = session.role === 'TEACHER'
+
+  const perCourse = await Promise.all(
+    courses.map(async (course) => {
+      const [assignments, grades] = await Promise.all([
+        listAssignments(course.courseId, { limit: 100 }),
+        isTeacher
+          ? getGradebook(course.courseId).then(
+              (book) =>
+                book.rows
+                  .flatMap((row) => row.grades)
+                  .filter((grade) => grade.status === 'DRAFT').length,
+            )
+          : course.status === 'PUBLISHED'
+            ? getMyGrades(course.courseId).then((list) => list.items.length)
+            : Promise.resolve(0),
+      ])
+      return {
+        assignments: assignments.items.length,
+        drafts: assignments.items.filter((item) => item.status === 'DRAFT').length,
+        grades,
+      }
+    }),
+  )
+
+  return perCourse.reduce(
+    (total, item) => ({
+      assignments: total.assignments + item.assignments,
+      drafts: total.drafts + item.drafts,
+      grades: total.grades + item.grades,
+    }),
+    { assignments: 0, drafts: 0, grades: 0 },
+  )
+}
+
 export function DashboardPage() {
   const { session, mode } = useAuth()
   const coursesState = useApi(() => listCourses({ limit: 100 }), [session?.userId])
+  const academicState = useApi(() => loadAcademicSummary(session), [session?.userId])
   const notificationsState = useApi(
     () => listMyNotifications({ limit: 100 }),
     [session?.userId],
@@ -88,8 +144,26 @@ export function DashboardPage() {
       hint: coursesState.error ? 'Sin conexión' : 'ms-cursos',
       icon: BookOpen,
     },
-    { label: 'Tareas', value: '—', hint: 'Llega con FE-03', icon: ClipboardList },
-    { label: 'Notas', value: '—', hint: 'Llega con FE-03', icon: GraduationCap },
+    {
+      label: 'Tareas',
+      value: academicState.loading ? '…' : String(academicState.data?.assignments ?? '—'),
+      hint: academicState.error
+        ? 'Sin conexión'
+        : isTeacher
+          ? `${academicState.data?.drafts ?? 0} en borrador`
+          : 'Publicadas en tus cursos',
+      icon: ClipboardList,
+    },
+    {
+      label: isTeacher ? 'Notas por publicar' : 'Notas',
+      value: academicState.loading ? '…' : String(academicState.data?.grades ?? '—'),
+      hint: academicState.error
+        ? 'Sin conexión'
+        : isTeacher
+          ? 'Borradores en el libro de notas'
+          : 'Publicadas por tus docentes',
+      icon: GraduationCap,
+    },
     {
       label: 'Avisos',
       value: notificationsState.loading ? '…' : countLabel(notificationsState.data),
