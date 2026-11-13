@@ -11,11 +11,43 @@ export type ApiService = (typeof API_SERVICES)[number]
 
 const env = import.meta.env
 
-export const API_BASE_URLS: Record<ApiService, string | undefined> = {
-  usuarios: env.VITE_API_USUARIOS,
-  cursos: env.VITE_API_CURSOS,
-  contenidos: env.VITE_API_CONTENIDOS,
-  evaluaciones: env.VITE_API_EVALUACIONES,
-  calificaciones: env.VITE_API_CALIFICACIONES,
-  notificaciones: env.VITE_API_NOTIFICACIONES,
+export const IS_MOCK_MODE = env.VITE_USE_MOCKS === 'true'
+
+export const MOCK_API_PREFIX = '/mock-api'
+
+function mockBase(service: ApiService): string {
+  return `${MOCK_API_PREFIX}/${service}`
 }
+
+export const API_BASE_URLS: Record<ApiService, string | undefined> = IS_MOCK_MODE
+  ? {
+      usuarios: mockBase('usuarios'),
+      cursos: mockBase('cursos'),
+      contenidos: mockBase('contenidos'),
+      evaluaciones: mockBase('evaluaciones'),
+      calificaciones: mockBase('calificaciones'),
+      notificaciones: mockBase('notificaciones'),
+    }
+  : {
+      usuarios: env.VITE_API_USUARIOS,
+      cursos: env.VITE_API_CURSOS,
+      contenidos: env.VITE_API_CONTENIDOS,
+      evaluaciones: env.VITE_API_EVALUACIONES,
+      calificaciones: env.VITE_API_CALIFICACIONES,
+      notificaciones: env.VITE_API_NOTIFICACIONES,
+    }
+
+export type AuthMode = 'mock' | 'cognito'
+
+export const AUTH_MODE: AuthMode = env.VITE_AUTH_MODE === 'cognito' ? 'cognito' : 'mock'
+
+export const IS_COGNITO_AUTH = AUTH_MODE === 'cognito'
+
+export const COGNITO_CONFIG = {
+  userPoolId: env.VITE_COGNITO_USER_POOL_ID ?? '',
+  userPoolClientId: env.VITE_COGNITO_CLIENT_ID ?? '',
+}
+
+export const IS_COGNITO_CONFIGURED = Boolean(
+  COGNITO_CONFIG.userPoolId && COGNITO_CONFIG.userPoolClientId,
+)

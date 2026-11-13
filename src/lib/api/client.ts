@@ -1,5 +1,9 @@
-import { API_BASE_URLS, type ApiService } from '@/lib/env'
-import { readSession } from '@/lib/session'
+import { cognitoIdToken } from '@/features/auth/cognito'
+import { API_BASE_URLS, IS_COGNITO_AUTH, type ApiService } from '@/lib/env'
+import { readSession, writeSession } from '@/lib/session'
+
+/** Se dispara cuando la sesión ya no es válida (401); AuthProvider cierra sesión. */
+export const SESSION_EXPIRED_EVENT = 'nubeduca:session-expired'
 
 export interface ApiErrorBody {
   code?: string
@@ -24,23 +28,44 @@ export class ApiError extends Error {
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  rawBody?: BodyInit
+  contentType?: string
   headers?: Record<string, string>
   signal?: AbortSignal
 }
 
-function buildHeaders(options: ApiRequestOptions): Record<string, string> {
+async function currentToken(): Promise<string | null> {
+  const session = readSession()
+  if (!session) {
+    return null
+  }
+  if (!IS_COGNITO_AUTH) {
+    return session.token
+  }
+
+  // Amplify renueva el ID token con el refresh token cuando está por vencer.
+  const token = await cognitoIdToken()
+  if (token && token !== session.token) {
+    writeSession({ ...session, token })
+  }
+  return token
+}
+
+async function buildHeaders(options: ApiRequestOptions): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...options.headers,
   }
 
-  if (options.body !== undefined) {
+  if (options.rawBody !== undefined) {
+    headers['Content-Type'] = options.contentType ?? 'text/plain'
+  } else if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
 
-  const session = readSession()
-  if (session) {
-    headers.Authorization = session.token
+  const token = await currentToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
   }
 
   return headers
@@ -62,8 +87,13 @@ export async function apiRequest<T>(
 
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
     method: options.method ?? 'GET',
-    headers: buildHeaders(options),
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    headers: await buildHeaders(options),
+    body:
+      options.rawBody !== undefined
+        ? options.rawBody
+        : options.body === undefined
+          ? undefined
+          : JSON.stringify(options.body),
     signal: options.signal,
   })
 
@@ -72,6 +102,10 @@ export async function apiRequest<T>(
   }
 
   const data: unknown = await response.json().catch(() => null)
+
+  if (response.status === 401 && readSession()) {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+  }
 
   if (!response.ok) {
     const body = (data ?? {}) as ApiErrorBody
@@ -95,6 +129,19 @@ export const api = {
     body?: unknown,
     options?: ApiRequestOptions,
   ) => apiRequest<T>(service, path, { ...options, method: 'POST', body }),
+  postRaw: <T>(
+    service: ApiService,
+    path: string,
+    rawBody: BodyInit,
+    contentType: string,
+    options?: ApiRequestOptions,
+  ) =>
+    apiRequest<T>(service, path, {
+      ...options,
+      method: 'POST',
+      rawBody,
+      contentType,
+    }),
   put: <T>(
     service: ApiService,
     path: string,

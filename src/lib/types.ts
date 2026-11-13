@@ -24,6 +24,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export interface Session {
   tenantId: TenantId
+  userId: string
   role: Role
   email: string
   name: string
