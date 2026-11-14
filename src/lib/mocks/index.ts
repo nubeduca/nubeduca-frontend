@@ -7,6 +7,7 @@ export async function enableMocks(): Promise<void> {
 
   const { worker } = await import('./browser')
   await worker.start({
+    // Modo mixto: lo que no es /mock-api (APIs reales VITE_API_*) pasa sin tocar.
     onUnhandledFrame: 'bypass',
     serviceWorker: {
       url: '/mockServiceWorker.js',
