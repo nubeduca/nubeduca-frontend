@@ -1,5 +1,5 @@
 import { GraduationCap, Send } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   Badge,
@@ -15,9 +15,9 @@ import { useAuth } from '@/features/auth/auth-context'
 import { getGradebook, getMyGrades, postGradeItem } from '@/lib/api/calificaciones'
 import { listSubmissions } from '@/lib/api/evaluaciones'
 import type { Course, Grade, GradeItem } from '@/lib/api/types'
-import { listUsers } from '@/lib/api/usuarios'
 import { errorMessage, formatDateTime, formatScore } from '@/lib/format'
 import { useApi } from '@/lib/hooks/useApi'
+import { useUserNames } from '@/lib/hooks/useUsers'
 import { CoursePicker } from '@/modules/cursos/components/CoursePicker'
 import { FeedbackView } from '@/modules/evaluaciones/components/FeedbackView'
 import { GradeOverrideModal } from '../components/GradeOverrideModal'
@@ -193,24 +193,14 @@ interface SelectedCell {
 
 function Gradebook({ course }: { course: Course }) {
   const state = useApi(() => getGradebook(course.courseId), [course.courseId])
-  const usersState = useApi(() => listUsers({ limit: 100 }), [])
   const [postingId, setPostingId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'ok' } | null>(
     null,
   )
   const [selected, setSelected] = useState<SelectedCell | null>(null)
 
-  const names = useMemo(
-    () =>
-      new Map(
-        (usersState.data?.items ?? []).map((user) => [
-          user.userId,
-          `${user.givenName} ${user.familyName}`,
-        ]),
-      ),
-    [usersState.data],
-  )
-  const nameOf = (userId: string) => names.get(userId) ?? userId.slice(0, 8)
+  // Nombres de los alumnos del libro de notas (GET /users/{id}, con caché).
+  const nameOf = useUserNames((state.data?.rows ?? []).map((row) => row.studentId))
 
   async function handlePost(gradeItem: GradeItem) {
     setMessage(null)

@@ -1,4 +1,4 @@
-import { Plus, Trash2, Upload } from 'lucide-react'
+import { Plus, Search, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import {
@@ -28,9 +28,10 @@ import {
   listEnrollments,
   listSections,
 } from '@/lib/api/cursos'
-import type { ImportResult } from '@/lib/api/types'
+import type { ImportResult, User } from '@/lib/api/types'
 import { listUsers } from '@/lib/api/usuarios'
 import { useApi } from '@/lib/hooks/useApi'
+import { rememberUsers, useUsers } from '@/lib/hooks/useUsers'
 
 export interface EnrollmentPanelProps {
   courseId: string
@@ -76,11 +77,24 @@ export function EnrollmentPanel({ courseId }: EnrollmentPanelProps) {
   const [importSaving, setImportSaving] = useState(false)
   const [droppingId, setDroppingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [codeQuery, setCodeQuery] = useState('')
+  const [codeSearching, setCodeSearching] = useState(false)
+  const [codeMessage, setCodeMessage] = useState<string | null>(null)
+  const [foundUsers, setFoundUsers] = useState<User[]>([])
 
-  const users = usersState.data?.items ?? []
+  const listed = usersState.data?.items ?? []
   const sections = sectionsState.data?.items ?? []
   const enrollments = enrollmentsState.data?.items ?? []
-  const userById = new Map(users.map((user) => [user.userId, user]))
+  // Con miles de usuarios, los matriculados que no vinieron en la lista se piden uno por uno.
+  const enrolledUsers = useUsers(enrollments.map((enrollment) => enrollment.userId))
+  const users = [
+    ...foundUsers.filter((found) => !listed.some((user) => user.userId === found.userId)),
+    ...listed,
+  ]
+  const userById = new Map([
+    ...enrolledUsers,
+    ...users.map((user) => [user.userId, user] as const),
+  ])
   const sectionById = new Map(sections.map((section) => [section.sectionId, section]))
   const loading = usersState.loading || sectionsState.loading || enrollmentsState.loading
   const loadError =
@@ -106,7 +120,42 @@ export function EnrollmentPanel({ courseId }: EnrollmentPanelProps) {
     })),
   ]
 
+  async function handleCodeSearch() {
+    const code = codeQuery.trim()
+    setCodeMessage(null)
+    if (!code) {
+      setCodeMessage('Escribe un código institucional.')
+      return
+    }
+    setCodeSearching(true)
+    try {
+      const page = await listUsers({ institutionalCode: code, limit: 1 })
+      const user = page.items[0]
+      if (!user) {
+        setCodeMessage(`No hay un usuario con el código ${code}.`)
+        return
+      }
+      rememberUsers([user])
+      setFoundUsers((current) => [
+        user,
+        ...current.filter((u) => u.userId !== user.userId),
+      ])
+      setForm((current) => ({
+        ...current,
+        userId: user.userId,
+        role: user.role === 'TEACHER' ? 'TEACHER' : 'STUDENT',
+      }))
+      setCodeMessage(`Seleccionado: ${user.givenName} ${user.familyName}.`)
+    } catch (cause) {
+      setCodeMessage(messageFromError(cause))
+    } finally {
+      setCodeSearching(false)
+    }
+  }
+
   function openForm() {
+    setCodeQuery('')
+    setCodeMessage(null)
     setForm({
       userId: '',
       role: 'STUDENT',
@@ -311,6 +360,32 @@ export function EnrollmentPanel({ courseId }: EnrollmentPanelProps) {
         }
       >
         <form id="enrollment-form" className="space-y-4" onSubmit={handleCreate}>
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Input
+                label="Buscar por código institucional"
+                placeholder="Ej. 202310457"
+                value={codeQuery}
+                onChange={(event) => setCodeQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void handleCodeSearch()
+                  }
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={codeSearching}
+              leftIcon={<Search className="size-4" aria-hidden />}
+              onClick={() => void handleCodeSearch()}
+            >
+              Buscar
+            </Button>
+          </div>
+          {codeMessage ? <p className="text-sm text-slate-600">{codeMessage}</p> : null}
           <Select
             label="Usuario"
             options={userOptions}

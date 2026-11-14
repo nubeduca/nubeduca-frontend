@@ -17,6 +17,7 @@ import { listSubmissions } from '@/lib/api/evaluaciones'
 import type { Assignment, Submission } from '@/lib/api/types'
 import { formatDateTime, formatScore } from '@/lib/format'
 import { useApi } from '@/lib/hooks/useApi'
+import { useUserNames } from '@/lib/hooks/useUsers'
 import { FileLinks } from './FileLinks'
 import { GradeWithRubricModal } from './GradeWithRubricModal'
 
@@ -58,8 +59,9 @@ function SubmissionsContent({
   )
   const [grading, setGrading] = useState<Submission | null>(null)
   const submissions = latestAttempts(state.data?.items ?? [])
-  const nameOf = (studentId: string) =>
-    studentNames.get(studentId) ?? studentId.slice(0, 8)
+  // Los alumnos que no vinieron en la lista inicial se piden por id (GET /users/{id}).
+  const lookup = useUserNames(submissions.map((submission) => submission.studentId))
+  const nameOf = (studentId: string) => studentNames.get(studentId) ?? lookup(studentId)
 
   return (
     <>
