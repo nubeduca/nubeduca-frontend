@@ -77,6 +77,8 @@ Convenciones del contrato v1:
 - El `tenantId` y el rol salen del token (`custom:tenant_id`, `custom:role`), nunca del body.
 - Errores con forma `{ code, message, requestId }`.
 - Las URLs base van en `VITE_API_*`. **Modo mixto:** con `VITE_USE_MOCKS=true`, el servicio que tenga su `VITE_API_*` llena usa la API real y el resto sigue en MSW (p. ej. solo `VITE_API_NOTIFICACIONES`).
+  - Con ms-cursos real, `src/lib/api/cursos.ts` copia los cursos y matrículas que responde a los mocks (`src/lib/mocks/bridge.ts`), así contenidos, evaluaciones y calificaciones simulados reconocen los cursos reales.
+  - Con ms-usuarios real (miles de usuarios), los nombres que no vienen en `listUsers` se piden por id (`src/lib/hooks/useUsers.ts`) y el panel de matrícula busca por código institucional.
 
 ## Cliente de API
 
