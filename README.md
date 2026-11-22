@@ -2,9 +2,9 @@
 
 Shell del frontend de **Nubeduca**, el LMS SaaS multi-tenant del proyecto de Cloud Computing (UTEC, 2026-2).
 
-Este repo deja la **base compartida** para que todos agreguen pantallas sin pisarse: layout, rutas, design system, login simulado, cliente de API y carpetas por módulo. Corresponde a la tarea **FE-01** del backlog.
+Este repo deja la **base compartida** para que todos agreguen pantallas sin pisarse: layout, rutas, design system, login (simulado o Cognito), cliente de API y carpetas por módulo. Corresponde a la tarea **FE-01** del backlog.
 
-> La app se publica en **AWS Amplify**. El login todavía es **simulado**; en AUTH-01 se reemplaza por Cognito y el tenant/rol saldrán del token.
+> La app se publica en **AWS Amplify**. El login tiene dos modos: **simulado** (`VITE_AUTH_MODE=mock`, por defecto) y **Amazon Cognito** (`VITE_AUTH_MODE=cognito`), donde el tenant y el rol salen del ID token.
 
 ## Stack
 
@@ -102,14 +102,41 @@ VITE_API_CALIFICACIONES=
 VITE_API_NOTIFICACIONES=
 ```
 
-## Login simulado (temporal)
+## Login: simulado y Cognito
+
+El modo se elige con `VITE_AUTH_MODE`:
+
+| Modo                 | Qué hace                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `mock` (por defecto) | Login simulado. El `token` es `mock.<tenant>.<ROL>.<userId>` y solo sirve con APIs en `authMode=mock` o con MSW. |
+| `cognito`            | Login real con Amazon Cognito (`aws-amplify`). Es el modo de **producción**.                                     |
+
+### Modo Cognito
+
+```dotenv
+VITE_AUTH_MODE=cognito
+VITE_COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_USE_MOCKS=false
+```
+
+- En Amplify estas variables las pone `nubeduca-backend/infra/frontend` desde SSM (`/nubeduca/<stage>/cognito/*`). El despliegue de prod (`scripts/desplegar.sh prod`) ya pasa `authMode=cognito`.
+- El cliente de API manda `Authorization: Bearer <ID token>`. Tiene que ser el **ID token**, no el access token: solo el ID token trae `custom:tenant_id` y `custom:role`, y con el access token el authorizer responde 401.
+- Amplify renueva el ID token con el refresh token. Si la API responde 401, la sesión se cierra y se vuelve a `/login`.
+- Se valida que el `custom:tenant_id` del token sea el de la institución elegida en el formulario, y que `custom:role` sea `STUDENT`, `TEACHER` o `ADMIN`.
+- En el primer login se llama a `POST /users/me` (ms-usuarios) para crear el perfil y publicar `user.provisioned`.
+
+### Probar en local contra un stage
+
+1. Con `nubeduca-backend` ya desplegado en un stage, crea los usuarios demo: `scripts/crear_usuarios_demo.sh <stage>` (clave `Nubeduca2026!`, o la de `DEMO_PASSWORD`). Crea `alumno.demo@`, `docente.demo@` y `admin.demo@` en `utec.edu.pe` y `upc.edu.pe`.
+2. Copia `.env.example` a `.env.local`, pon el modo Cognito de arriba y las seis `VITE_API_*` del stage (salen de SSM: `/nubeduca/<stage>/api/<servicio>/url`).
+3. `npm run dev`, elige la institución y entra con un usuario demo. En la pestaña _Network_ las llamadas deben llevar el `Bearer` y responder 200; sin sesión, 401.
+
+### Modo simulado
 
 - `AuthProvider` guarda la sesión en `localStorage` (`nubeduca.session`).
 - `RequireAuth` protege el shell y permite restringir por rol.
 - `GuestOnly` evita que un usuario logueado vuelva a `/login`.
-- La campana de notificaciones es un **placeholder navegable**; la bandeja real llega con ENG-01.
-
-Cuando AUTH-01 esté listo, se reemplaza el login simulado por Cognito y el `token` mock por el ID token real.
 
 ## Desplegar en AWS Amplify
 
